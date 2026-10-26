@@ -1,0 +1,8 @@
+node_modules/
+dist/
+data/
+reports/
+.pnpm-store/
+.idea/
+.env*
+!.env.example
