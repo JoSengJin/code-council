@@ -43,7 +43,7 @@ function App(){
     }
     if(typeof Notification!=='undefined'&&Notification.permission==='granted'){
       try {
-        const notification=new Notification('토론 완료',{body:session.topic});
+        const notification=new Notification(`토론 완료 · ${projects.find(p=>p.id===session.projectId)?.name||'프로젝트 없음'}`,{body:session.topic});
         notification.onclick=()=>{window.focus();setSelectedProjectId(session.projectId||null);setCurrent(session);setView('chat');notification.close();};
       } catch { /* 화면 알림과 탭 제목은 계속 표시된다. */ }
     }

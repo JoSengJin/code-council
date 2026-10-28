@@ -99,3 +99,8 @@ aside .project-row .project:hover{background:transparent}
 aside .project-session-row .project-session{width:100%;margin-left:0;padding-right:54px}
 aside .project-session-row .project-session:hover{background:transparent}
 .archive-main{flex:1;min-width:0}.archive-main strong,.archive-main small{display:block;overflow-wrap:anywhere}.archive-main small{color:#95a4b5;margin-top:5px}
+/* 긴 토론 주제는 말줄임 대신 여러 줄로 보여준다 */
+.session strong,aside .project-session,header h2,.completion-notice span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;white-space:normal;overflow:hidden;overflow-wrap:anywhere;text-overflow:clip}
+.session strong,aside .project-session{-webkit-line-clamp:2;line-clamp:2}
+aside .project-session{height:auto}
+.completion-notice{align-items:flex-start}.completion-notice span{flex:1}
