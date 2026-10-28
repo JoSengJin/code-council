@@ -36,6 +36,18 @@ describe('Codex read-only proposal',()=>{
       expect(rpc).toHaveBeenCalledWith('turn/start',expect.objectContaining({cwd,sandboxPolicy:expect.objectContaining({writableRoots:[cwd]})}));
     } finally {deleteSession(session.id);}
   });
+  it('bounds exploration, and does not re-explore for follow-up calls',async()=>{
+    const run=async(explore:boolean)=>{
+      const bridge=new CodexBridge(()=>{});
+      vi.spyOn(bridge,'connect').mockResolvedValue();
+      const rpc=vi.spyOn(bridge as any,'rpc').mockImplementation(async(method:unknown)=>method==='account/read'?{account:{type:'chatgpt'}}:method==='thread/start'?{thread:{id:'t'}}:{turn:{id:'u'}});
+      void bridge.propose('요약',resolve('.'),undefined,undefined,explore).catch(()=>{});
+      await vi.waitFor(()=>expect(rpc).toHaveBeenCalledWith('turn/start',expect.anything()));
+      return JSON.stringify(rpc.mock.calls.find(c=>c[0]==='turn/start')![1]);
+    };
+    expect(await run(true)).toContain('skip node_modules');
+    expect(await run(false)).toContain('Do not re-explore');
+  });
   it('does not start a paid API-key Codex session',async()=>{
     const bridge=new CodexBridge(()=>{});
     vi.spyOn(bridge,'connect').mockResolvedValue();

@@ -17,8 +17,8 @@ export const deleteGraphThread = (id:string) => checkpointer.deleteThread(id);
 const json = (text: string) => { const start=text.indexOf('{'), end=text.lastIndexOf('}'); if(start<0||end<start) throw new Error('Judge did not return JSON'); return JSON.parse(text.slice(start,end+1)); };
 export function graph(onEvent: (sessionId:string,event:unknown)=>void, signal?: AbortSignal, bridge?: CodexBridge) {
   const {gemini,nemotron,judge} = providers();
-  const codex=(session:Session):Provider=>({name:'codex',model:'Codex App Server',complete:(prompt,signal,onChunk)=>
-    process.env.MOCK_PROVIDERS==='true'?gemini.complete(prompt,signal,onChunk):bridge!.propose(prompt,session.projectPath,signal,onChunk)});
+  const codex=(session:Session,explore=true):Provider=>({name:'codex',model:'Codex App Server',complete:(prompt,signal,onChunk)=>
+    process.env.MOCK_PROVIDERS==='true'?gemini.complete(prompt,signal,onChunk):bridge!.propose(prompt,session.projectPath,signal,onChunk,explore)});
   const call = async (provider: Provider,prompt:string,s:Session,round:number,phase:string) => {
     const messageId=randomUUID();
     onEvent(s.id,{type:'message-start',messageId,role:phase==='judge'?'judge':provider.name,round,phase});
@@ -48,8 +48,8 @@ export function graph(onEvent: (sessionId:string,event:unknown)=>void, signal?: 
     })
     .addNode('final',async state=>{
       const session={...state.session};
-      session.decision=(await call(codex(session),`원래 질문: ${session.topic}\n다음 토론에서 검증 상태와 미해결 위험을 구분하며 ${session.projectPath?'저장소에 근거한':'일반적인'} 최종 기술 결정을 작성하라. 원래 질문에 직접 답하고, 토론에서 "추정"으로 남은 외부 내용은 최종에서도 추정으로 표시하라:\n${JSON.stringify(session.rounds)}`,session,session.rounds.length,'decision')).result.text;
-      session.plan=(await call(codex(session),`다음 결정에 대한 ${session.projectPath?'파일·테스트·롤백이 포함된 실행계획':'검증 방법과 적용 단계를 포함한 제안'}을 작성하라. 사용자 승인 전 실행하지 않는다:\n${session.decision}`,session,session.rounds.length,'plan')).result.text;
+      session.decision=(await call(codex(session,false),`원래 질문: ${session.topic}\n다음 토론에서 검증 상태와 미해결 위험을 구분하며 ${session.projectPath?'저장소에 근거한':'일반적인'} 최종 기술 결정을 작성하라. 원래 질문에 직접 답하고, 토론에서 "추정"으로 남은 외부 내용은 최종에서도 추정으로 표시하라:\n${JSON.stringify(session.rounds)}`,session,session.rounds.length,'decision')).result.text;
+      session.plan=(await call(codex(session,false),`다음 결정에 대한 ${session.projectPath?'파일·테스트·롤백이 포함된 실행계획':'검증 방법과 적용 단계를 포함한 제안'}을 작성하라. 사용자 승인 전 실행하지 않는다:\n${session.decision}`,session,session.rounds.length,'plan')).result.text;
       session.status=state.route==='STOP'?'stopped':session.projectPath?'awaiting_approval':'completed'; saveSession(session); writeReports(session); onEvent(session.id,{type:'ready',session}); return {session};
     })
     .addEdge(START,'proposalNode').addEdge('proposalNode','criticismNode').addEdge('criticismNode','rebuttalNode').addEdge('rebuttalNode','judge')

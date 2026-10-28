@@ -59,6 +59,11 @@ describe('firstDraftPrompt', () => {
     expect(prompt).toContain('직접 답하는 것이 목적');
   });
 
+  it('caps exploration and excludes dependency folders', () => {
+    expect(prompt).toContain('10개 안팎');
+    expect(prompt).toContain('node_modules');
+  });
+
   it('forbids claiming full redesign from one interpretation', () => {
     expect(prompt).toContain('끝났다고 결론 내리지 마라');
   });
