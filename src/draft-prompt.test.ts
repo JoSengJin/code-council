@@ -52,6 +52,13 @@ describe('firstDraftPrompt', () => {
     expect(firstDraftPrompt('neutral topic', 'C:\\work\\app', '')).not.toMatch(/test3|cal.diy|shr-ffw|Shell.tsx/i);
   });
 
+  it('compares named open source from knowledge when no source is provided, marked as estimate', () => {
+    expect(prompt).toContain('추정(기억 기반, 미검증)');
+    expect(prompt).toContain('비교를 생략하지 마라');
+    expect(prompt).not.toContain('제공된 원문이 있을 때만');
+    expect(prompt).toContain('직접 답하는 것이 목적');
+  });
+
   it('forbids claiming full redesign from one interpretation', () => {
     expect(prompt).toContain('끝났다고 결론 내리지 마라');
   });
