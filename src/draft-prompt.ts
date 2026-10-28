@@ -7,6 +7,10 @@ const scopeRules = `제안 전에 다음 순서를 따르고, 각 단계의 결�
 
 const evidenceRules = '확인한 사실은 로컬 파일·외부 원문·추정으로 구분하라. 원문을 직접 확인해 비교했다면 원문 링크와 커밋을 제시하라. 확인하지 못한 외부 내용은 추정으로 표시하고 확인된 사실처럼 단정하지 마라. 로컬 파일은 마크다운 링크가 아니라 백틱 안의 `전체경로:줄번호`로 인용하고, 실제로 열어 확인한 줄만 적어라. 줄을 확인하지 못했으면 줄번호 없이 경로만 적어라. 링크는 http(s) 외부 원문에만 사용하라. 코드는 수정하지 마라.';
 
+export function analysisConclusionPrompt(topic: string, hasProject: boolean, rounds: unknown): string {
+  return `원래 질문: ${topic}\n아래 토론을 바탕으로 질문에 직접 답하는 최종 결론을 작성하라. 질문하지 않은 구현 계획·파일별 변경·롤백 절차·검증 명령은 쓰지 마라.\n구성: "## 이점", "## 고민할 점과 주의점", "## 우리 프로젝트에 적용한다면"(권고와 적용 기준). 이점과 주의점은 질문이 대조를 요구한 대상끼리 주제에 해당하는 비교 축(예: 계약, 호출 방식, 인증·오류 처리, 호환성, 비용)만 골라 비교하라.\n확인한 사실과 추정은 항목 끝에 짧게 구분하고, 미확인 사항은 마지막에 한두 줄로 모아라. 토론 과정(누가 무엇을 주장했는지)은 언급하지 마라.${hasProject ? ' 저장소에서 확인한 파일은 백틱 안의 `경로`로 인용하라.' : ''}\n토론: ${JSON.stringify(rounds)}`;
+}
+
 export function firstDraftPrompt(topic: string, projectPath: string | undefined, references: string): string {
   const scope = projectPath
     ? `저장소의 관련 파일과 호출 경로를 근거로 설계한다.\n${scopeRules}`

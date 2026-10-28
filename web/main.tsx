@@ -8,7 +8,7 @@ type Score={rationale:string;technicalAccuracy:number;logicalValidity:number;cou
 type Round={index:number;proposal:string;criticism:string;rebuttal:string;score:Score;unresolved:string[];route:string};
 type Project={id:string;name:string;path:string;archivedAt?:string|null};
 type DirectoryListing={path:string;parent:string|null;home:string;root:string;directories:{name:string;path:string}[]};
-type Session={id:string;projectId?:string;projectPath?:string;topic:string;status:string;archivedAt?:string|null;rounds:Round[];decision:string;plan:string;execution:string;mode:string};
+type Session={id:string;kind?:'analysis'|'implementation';projectId?:string;projectPath?:string;topic:string;status:string;archivedAt?:string|null;rounds:Round[];decision:string;plan:string;execution:string;mode:string};
 type Perf={calls:number;success:number;errors:number;meanLatencyMs:number|null;meanQuality:number|null;validRatio:number|null;inputTokens:number|null;outputTokens:number|null;raw:{sessionId:string;latencyMs:number;score:Score|null;error:string|null}[]};
 type AgentUsage={provider:string;calls:number;inputTokens:number|null;outputTokens:number|null};
 type Limits={codex:{primary?:{usedPercent:number;windowDurationMins?:number|null};secondary?:{usedPercent:number;windowDurationMins?:number|null}}|null;openrouter:{limit:number|null;remaining:number|null;reset:string|null;freeRequests:{limit:number;used:number;remaining:number}|null}|null};
@@ -132,7 +132,7 @@ function App(){
             {m.text?<Markdown text={m.text}/>:<p>{m.role==='codex'&&m.phase==='proposal'?'Codex가 프로젝트를 읽고 첫 초안을 작성 중입니다. 첫 응답까지 최대 10분 걸릴 수 있습니다.':'응답을 기다리는 중…'}</p>}{!m.done&&m.text&&<span className="typing">▍</span>}
           </article>)}
         </div>
-        {current.decision&&<section><h3>기술 결정</h3><Markdown text={current.decision}/><h3>실행계획</h3><Markdown text={current.plan}/></section>}
+        {current.decision&&<section><h3>{current.kind==='analysis'?'결론':'기술 결정'}</h3><Markdown text={current.decision}/>{current.plan&&<><h3>실행계획</h3><Markdown text={current.plan}/></>}</section>}
         {current.status==='awaiting_approval'&&<section><h3>실행 대상 확인</h3><p className="project-path">{current.projectPath||'프로젝트 미지정: 이 세션은 실행할 수 없습니다. 프로젝트를 선택해 새 세션을 시작하세요.'}</p><button className="primary" disabled={!current.projectPath} onClick={()=>void post(`/api/sessions/${current.id}/approve`).then(()=>load(current.id))}>이 프로젝트에서 계획 승인 및 Codex 실행</button></section>}
         {approvals.map(a=><section key={a.key} className="approval"><h3>Codex 실행 승인 요청</h3><pre>{JSON.stringify(a.params,null,2)}</pre><button onClick={()=>void post(`/api/sessions/${current.id}/approval`,{key:a.key,decision:'accept'})}>승인</button><button onClick={()=>void post(`/api/sessions/${current.id}/approval`,{key:a.key,decision:'decline'})}>거절</button></section>)}
         {current.execution&&<section><h3>실행 결과</h3><pre>{current.execution}</pre></section>}

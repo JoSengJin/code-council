@@ -8,8 +8,9 @@ import { saveSession } from './db.js';
 import { writeReports } from './reports.js';
 import { CodexBridge } from './codex.js';
 import { collectReferences } from './references.js';
-import { firstDraftPrompt } from './draft-prompt.js';
-import type { Provider } from './types.js';
+import { analysisConclusionPrompt, firstDraftPrompt } from './draft-prompt.js';
+import { classifyTopic } from './classify.js';
+import type { Provider, TopicKind } from './types.js';
 
 const State = Annotation.Root({ session: Annotation<Session>, proposal: Annotation<string>, criticism: Annotation<string>, rebuttal: Annotation<string>, score: Annotation<Round['score']>, unresolved: Annotation<string[]>, route: Annotation<Round['route']> });
 const checkpointer = new SqliteCheckpoint(resolve('data/graph.sqlite'));
@@ -33,7 +34,12 @@ export function graph(onEvent: (sessionId:string,event:unknown)=>void, signal?: 
       const prompt=first
         ?firstDraftPrompt(state.session.topic,state.session.projectPath,references)
         :`개발 주제: ${state.session.topic}\n이전 라운드: ${JSON.stringify(state.session.rounds.at(-1))}\n남은 쟁점: ${state.unresolved.join('; ')||'없음'}\nCodex의 첫 초안을 출발점으로 반박과 재반론을 반영해 개선안을 제안하라.`;
-      return {proposal:(await call(first?codex(state.session):gemini,prompt,state.session,state.session.rounds.length+1,'proposal')).result.text};
+      const draft=call(first?codex(state.session):gemini,prompt,state.session,state.session.rounds.length+1,'proposal');
+      if(!first||state.session.kind)return {proposal:(await draft).result.text};
+      // 첫 초안과 병렬로 주제 유형을 분류한다. mock은 기존 구현형 흐름을 유지한다.
+      const [kind,drafted]=await Promise.all([process.env.MOCK_PROVIDERS==='true'?Promise.resolve<TopicKind>('implementation'):classifyTopic(gemini,state.session.topic,signal),draft]);
+      const session={...state.session,kind}; saveSession(session);
+      return {proposal:drafted.result.text,session};
     })
     .addNode('criticismNode',async state=>({criticism:(await call(nemotron,`원래 질문: ${state.session.topic}\n아래 설계가 원래 질문에 직접 답하는지 먼저 판단하고, 벗어났으면 그 점을 첫 반박으로 제시하라. 이어서 기술적 결함, 보안, 성능, 반례를 구체적으로 반박하라. 초안의 "확인한 사실"과 "추정"을 구분해 점검하고, 근거 없이 단정한 외부 오픈소스 주장과 "추정"으로 표시된 주장을 우선 반박하라. 새 논거가 없으면 반복이라고 밝혀라.\n${state.proposal}`,state.session,state.session.rounds.length+1,'criticism')).result.text}))
     .addNode('rebuttalNode',async state=>({rebuttal:(await call(gemini,`원래 질문: ${state.session.topic}\n제안: ${state.proposal}\n반박: ${state.criticism}\n수용 여부와 수정된 설계를 명확히 답하라. 설계는 원래 질문에 직접 답해야 하며, 확인하지 못한 외부 내용은 계속 "추정"으로 표시하라.`,state.session,state.session.rounds.length+1,'rebuttal')).result.text}))
@@ -48,9 +54,10 @@ export function graph(onEvent: (sessionId:string,event:unknown)=>void, signal?: 
     })
     .addNode('final',async state=>{
       const session={...state.session};
-      session.decision=(await call(codex(session,false),`원래 질문: ${session.topic}\n다음 토론에서 검증 상태와 미해결 위험을 구분하며 ${session.projectPath?'저장소에 근거한':'일반적인'} 최종 기술 결정을 작성하라. 원래 질문에 직접 답하고, 토론에서 "추정"으로 남은 외부 내용은 최종에서도 추정으로 표시하라:\n${JSON.stringify(session.rounds)}`,session,session.rounds.length,'decision')).result.text;
-      session.plan=(await call(codex(session,false),`다음 결정에 대한 ${session.projectPath?'파일·테스트·롤백이 포함된 실행계획':'검증 방법과 적용 단계를 포함한 제안'}을 작성하라. 사용자 승인 전 실행하지 않는다:\n${session.decision}`,session,session.rounds.length,'plan')).result.text;
-      session.status=state.route==='STOP'?'stopped':session.projectPath?'awaiting_approval':'completed'; saveSession(session); writeReports(session); onEvent(session.id,{type:'ready',session}); return {session};
+      const analysis=session.kind==='analysis';
+      session.decision=(await call(codex(session,false),analysis?analysisConclusionPrompt(session.topic,!!session.projectPath,session.rounds):`원래 질문: ${session.topic}\n다음 토론에서 검증 상태와 미해결 위험을 구분하며 ${session.projectPath?'저장소에 근거한':'일반적인'} 최종 기술 결정을 작성하라. 원래 질문에 직접 답하고, 토론에서 "추정"으로 남은 외부 내용은 최종에서도 추정으로 표시하라:\n${JSON.stringify(session.rounds)}`,session,session.rounds.length,'decision')).result.text;
+      if(!analysis)session.plan=(await call(codex(session,false),`다음 결정에 대한 ${session.projectPath?'파일·테스트·롤백이 포함된 실행계획':'검증 방법과 적용 단계를 포함한 제안'}을 작성하라. 사용자 승인 전 실행하지 않는다:\n${session.decision}`,session,session.rounds.length,'plan')).result.text;
+      session.status=state.route==='STOP'?'stopped':!analysis&&session.projectPath?'awaiting_approval':'completed'; saveSession(session); writeReports(session); onEvent(session.id,{type:'ready',session}); return {session};
     })
     .addEdge(START,'proposalNode').addEdge('proposalNode','criticismNode').addEdge('criticismNode','rebuttalNode').addEdge('rebuttalNode','judge')
     .addConditionalEdges('judge',state=>state.route==='CONTINUE'||state.route==='REVISE'?'proposalNode':'final')
