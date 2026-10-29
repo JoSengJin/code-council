@@ -47,7 +47,7 @@ export function graph(onEvent: (sessionId:string,event:unknown)=>void, signal?: 
       const evidence=first?await verifyEvidence(proposal,session.projectPath,topicRoots(session.topic)):state.evidence;
       return session===state.session?{proposal,evidence}:{proposal,evidence,session};
     })
-    .addNode('criticismNode',async state=>({criticism:(await call(nemotron,`원래 질문: ${state.session.topic}\n아래 설계가 원래 질문에 직접 답하는지 먼저 판단하고, 벗어났으면 그 점을 첫 반박으로 제시하라. 이어서 기술적 결함, 보안, 성능, 반례를 구체적으로 반박하라. 초안의 "확인한 사실"과 "추정"을 구분해 점검하고, 근거 없이 단정한 외부 오픈소스 주장과 "추정"으로 표시된 주장을 우선 반박하라. 새 논거가 없으면 반복이라고 밝혀라.\n${state.proposal}${evidenceNote(state.session,state.evidence)}`,state.session,state.session.rounds.length+1,'criticism')).result.text}))
+    .addNode('criticismNode',async state=>({criticism:(await call(nemotron,`원래 질문: ${state.session.topic}\n아래 설계가 원래 질문에 직접 답하는지 먼저 판단하고, 벗어났으면 그 점을 첫 반박으로 제시하라. 이어서 기술적 결함, 보안, 성능, 반례를 구체적으로 반박하라. 반박자는 저장소와 외부 원문을 볼 수 없다. 원문을 볼 수 없는 외부 내용을 더 자세히 설명하라고 요구하지 말고, 그런 주장은 추정으로 표시됐는지만 점검하라. 질문의 범위를 좁히거나 조건부로 권고한 것은 질문 회피가 아니다. 질문이 요구한 항목에 답했는지로 판단하라. 초안의 "확인한 사실"과 "추정"을 구분해 점검하고, 시스템이 검증한 로컬 근거와 주장의 일치, 논리의 비약, 놓친 반례, 근거 없는 단정처럼 검증 가능한 것만 공격하라. 새 논거가 없으면 반복이라고 밝혀라.\n${state.proposal}${evidenceNote(state.session,state.evidence)}`,state.session,state.session.rounds.length+1,'criticism')).result.text}))
     .addNode('rebuttalNode',async state=>({rebuttal:(await call(gemini,`원래 질문: ${state.session.topic}\n제안: ${state.proposal}\n반박: ${state.criticism}\n수용 여부와 수정된 설계를 명확히 답하라. 설계는 원래 질문에 직접 답해야 하며, 확인하지 못한 외부 내용은 계속 "추정"으로 표시하라.${evidenceNote(state.session,state.evidence)}`,state.session,state.session.rounds.length+1,'rebuttal')).result.text}))
     .addNode('judge',async state=>{
       const n=state.session.rounds.length+1;

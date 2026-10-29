@@ -14,6 +14,18 @@ describe('follow-up proposal prompt', () => {
   });
 });
 
+describe('criticism prompt', () => {
+  it('checks only available evidence and judges scoped answers by the requested items', () => {
+    expect(debateSource).toContain('원래 질문에 직접 답하는지 먼저 판단');
+    expect(debateSource).toContain('반박자는 저장소와 외부 원문을 볼 수 없다');
+    expect(debateSource).toContain('그런 주장은 추정으로 표시됐는지만 점검하라');
+    expect(debateSource).toContain('조건부로 권고한 것은 질문 회피가 아니다');
+    expect(debateSource).toContain('질문이 요구한 항목에 답했는지로 판단하라');
+    expect(debateSource).toContain('시스템이 검증한 로컬 근거와 주장의 일치, 논리의 비약, 놓친 반례, 근거 없는 단정');
+    expect(debateSource).toContain('목록에 없는 로컬 인용은 검증되지 않은 주장');
+  });
+});
+
 describe('firstDraftPrompt', () => {
   const prompt = firstDraftPrompt(topic, 'C:\\work\\app', '');
 
