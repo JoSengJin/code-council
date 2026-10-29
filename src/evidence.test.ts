@@ -43,6 +43,10 @@ describe('checkEntry', () => {
   it('verifies an excerpt inside the cited range, ignoring indentation and blank lines', () => {
     expect(checkEntry(make(3, 5, ['export function call() {', 'return fetch(url);']), file).status).toBe('verified');
   });
+  it('accepts an excerpt that omits lines inside the cited range but keeps their order', () => {
+    expect(checkEntry(make(1, 5, ['import x from "x";', 'return fetch(url);']), file).status).toBe('verified');
+    expect(checkEntry(make(1, 5, ['return fetch(url);', 'import x from "x";']), file).status).not.toBe('verified');
+  });
   it('reports the real location when the line numbers are wrong', () => {
     const check = checkEntry(make(1, 2, ['return fetch(url);']), file);
     expect(check).toMatchObject({ status: 'relocated', start: 4, end: 4 });

@@ -46,11 +46,19 @@ function locate(file: string[], excerpt: string[]): { start: number; end: number
   return null;
 }
 
+/** 발췌 줄이 순서대로 모두 있으면 true. 모델이 중간 줄을 생략해 복사한 경우를 허용한다. */
+function containsInOrder(file: string[], excerpt: string[]): boolean {
+  const want = significant(excerpt);
+  let k = 0;
+  for (const line of file) if (k < want.length && trim(line) === want[k]) k++;
+  return want.length > 0 && k === want.length;
+}
+
 export function checkEntry(entry: EvidenceEntry, file: string[]): EvidenceCheck {
   if (entry.start > file.length) return { status: 'out-of-range', start: entry.start, end: entry.end, lines: [] };
   const cited = file.slice(entry.start - 1, entry.end);
   if (!significant(entry.excerpt).length) return { status: 'no-excerpt', start: entry.start, end: entry.end, lines: cited };
-  if (locate(cited, entry.excerpt)) return { status: 'verified', start: entry.start, end: entry.end, lines: cited };
+  if (containsInOrder(cited, entry.excerpt)) return { status: 'verified', start: entry.start, end: entry.end, lines: cited };
   const found = locate(file, entry.excerpt);
   if (found) return { status: 'relocated', start: found.start + 1, end: found.end, lines: file.slice(found.start, found.end) };
   return { status: 'mismatch', start: entry.start, end: entry.end, lines: cited };
