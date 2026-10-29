@@ -99,6 +99,13 @@ describe('prompts', () => {
       expect(firstDraftPrompt('주제', undefined, '', kind)).not.toContain('## 로컬 근거');
     }
   });
+  it('keeps full paths in the block only and pairs reference parts with local counterparts', () => {
+    const analysis = firstDraftPrompt('A를 참고해 B를 개선', 'C:\\work\\app', '', 'analysis');
+    expect(analysis).toContain('본문에서는 전체경로 대신');
+    expect(analysis).toContain('구성 요소마다 우리 쪽에서 대응하는 부분');
+    expect(analysis).toContain('더 작은 안이 있으면 함께 비교');
+    expect(analysis).not.toMatch(/trpc|cal\.diy|api-client/i);
+  });
   it('passes verified evidence into the analysis conclusion', () => {
     expect(analysisConclusionPrompt('주제', true, [], '시스템이 디스크와 대조한 로컬 근거')).toContain('[검증됨] 항목만 사실로');
     expect(analysisConclusionPrompt('주제', true, [])).not.toContain('[검증됨]');
