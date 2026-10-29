@@ -15,7 +15,7 @@ import type { Provider, TopicKind } from './types.js';
 
 // 반박·재반론·Judge는 저장소를 볼 수 없으므로 초안의 로컬 근거를 시스템이 디스크와 대조한 결과를 대신 전달한다.
 const evidenceNote = (s: Session, evidence?: string) => !s.projectPath ? '' : evidence
-  ? `\n\n${evidence}\n로컬 파일 근거는 위 목록의 [검증됨] 항목만 사실로 취급하라. [불일치]·[줄 번호 불일치] 등 다른 표시와 목록에 없는 로컬 인용은 검증되지 않은 주장이므로 그렇게 지적하라.`
+  ? `\n\n${evidence}\n로컬 파일 근거는 위 목록에서 검증 표시가 '검증됨'으로 시작하는 항목만 사실로 취급하라. 줄 번호 정정 항목은 정정된 실제 줄을 인용하라. [불일치] 등 다른 표시와 목록에 없는 로컬 인용은 검증되지 않은 주장이므로 그렇게 지적하라.`
   : '\n\n초안에 시스템이 검증한 로컬 근거가 없다. 초안의 로컬 파일 인용은 "검증 불가"로 취급하라.';
 const State = Annotation.Root({ session: Annotation<Session>, proposal: Annotation<string>, evidence: Annotation<string>, criticism: Annotation<string>, rebuttal: Annotation<string>, score: Annotation<Round['score']>, unresolved: Annotation<string[]>, route: Annotation<Round['route']> });
 const checkpointer = new SqliteCheckpoint(resolve('data/graph.sqlite'));
@@ -42,7 +42,7 @@ export function graph(onEvent: (sessionId:string,event:unknown)=>void, signal?: 
       const references=first&&process.env.MOCK_PROVIDERS!=='true'?await collectReferences(session.topic,signal):'';
       const prompt=first
         ?firstDraftPrompt(session.topic,session.projectPath,references,kind)
-        :`개발 주제: ${state.session.topic}\n이전 라운드: ${JSON.stringify(state.session.rounds.at(-1))}\n남은 쟁점: ${state.unresolved.join('; ')||'없음'}\nCodex의 첫 초안을 출발점으로 반박과 재반론을 반영해 개선안을 제안하라. 첫 초안의 구조(질문 항목별 소제목, 참고 대상–우리 쪽 대응표)와 [검증됨]으로 표시된 로컬 근거를 유지하고 필요한 부분만 수정하라. 새로 쓰지 말고 근거가 없는 주장을 더하지 마라. 반박을 수용해 바꾼 부분은 그 이유를 한 줄로 표시하라.${evidenceNote(session,state.evidence)}`;
+        :`개발 주제: ${state.session.topic}\n이전 라운드: ${JSON.stringify(state.session.rounds.at(-1))}\n남은 쟁점: ${state.unresolved.join('; ')||'없음'}\nCodex의 첫 초안을 출발점으로 반박과 재반론을 반영해 개선안을 제안하라. 첫 초안의 구조(질문 항목별 소제목, 참고 대상–우리 쪽 대응표)와 검증 표시가 '검증됨'으로 시작하는 로컬 근거를 유지하고, 줄 번호 정정 항목은 정정된 실제 줄을 인용하며 필요한 부분만 수정하라. 새로 쓰지 말고 근거가 없는 주장을 더하지 마라. 반박을 수용해 바꾼 부분은 그 이유를 한 줄로 표시하라.${evidenceNote(session,state.evidence)}`;
       const proposal=(await call(first?codex(session):gemini,prompt,session,session.rounds.length+1,'proposal')).result.text;
       const evidence=first?await verifyEvidence(proposal,session.projectPath,topicRoots(session.topic)):state.evidence;
       return session===state.session?{proposal,evidence}:{proposal,evidence,session};

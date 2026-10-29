@@ -47,7 +47,7 @@ describe('checkEntry', () => {
     expect(checkEntry(make(1, 5, ['import x from "x";', 'return fetch(url);']), file).status).toBe('verified');
     expect(checkEntry(make(1, 5, ['return fetch(url);', 'import x from "x";']), file).status).not.toBe('verified');
   });
-  it('reports the real location when the line numbers are wrong', () => {
+  it('reports the verified real location when the line numbers are wrong', () => {
     const check = checkEntry(make(1, 2, ['return fetch(url);']), file);
     expect(check).toMatchObject({ status: 'relocated', start: 4, end: 4 });
   });
@@ -72,6 +72,16 @@ describe('verifyEvidence', () => {
     expect(result).toMatch(/\[검증됨\]/);
     expect(result).toContain('[불일치]');
     expect(result).toContain('import x from "x";');
+  });
+
+  it('counts relocated excerpts as verified and cites their corrected lines', async () => {
+    const result = await verifyEvidence(draft(
+      entry('src/client.ts', '2-3', '호출', ['return fetch(url);', '}']),
+      entry('src/client.ts', '1', '틀린 내용', ['return nothing;']),
+    ), root);
+    expect(result).toContain('검증됨 1/2');
+    expect(result).toContain('`src/client.ts:4-5` — 호출 [검증됨, 줄 번호 정정: 실제 4-5] (원래 인용: 2-3)');
+    expect(result).toContain('[불일치]');
   });
 
   it('does not read secret files or paths outside the allowed roots', async () => {
@@ -111,7 +121,7 @@ describe('prompts', () => {
     expect(analysis).not.toMatch(/trpc|cal\.diy|api-client/i);
   });
   it('passes verified evidence into the analysis conclusion', () => {
-    expect(analysisConclusionPrompt('주제', true, [], '시스템이 디스크와 대조한 로컬 근거')).toContain('[검증됨] 항목만 사실로');
-    expect(analysisConclusionPrompt('주제', true, [])).not.toContain('[검증됨] 항목만 사실로');
+    expect(analysisConclusionPrompt('주제', true, [], '시스템이 디스크와 대조한 로컬 근거')).toContain("검증 표시가 '검증됨'으로 시작하는 항목만 사실로");
+    expect(analysisConclusionPrompt('주제', true, [])).not.toContain("검증 표시가 '검증됨'으로 시작하는 항목만 사실로");
   });
 });

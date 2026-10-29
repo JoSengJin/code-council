@@ -42,7 +42,8 @@ describe('analysisConclusionPrompt', () => {
   it('retains decision-relevant reference mappings and verified line citations', () => {
     const withEvidence = analysisConclusionPrompt('핵심만', true, [], '[검증됨] src/example.ts:4');
     expect(withEvidence).toContain('결론에 영향을 주는 항목은 유지하고 설명만 줄여라');
-    expect(withEvidence).toContain('[검증됨]으로 표시된 `파일:줄`');
+    expect(withEvidence).toContain("검증 표시가 '검증됨'으로 시작하는 항목의 `파일:줄`");
+    expect(withEvidence).toContain('줄 번호 정정 항목은 정정된 실제 줄을 인용하라');
     expect(withEvidence).toContain('그 외 인용은 미확인으로 표시하라');
     expect(withEvidence).toContain('"저장소에서 확인하지 못했다"처럼 써라');
   });

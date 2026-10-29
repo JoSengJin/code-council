@@ -74,7 +74,7 @@ export function topicRoots(topic: string): string[] {
 
 const STATUS: Record<EvidenceCheck['status'], string> = {
   verified: '검증됨',
-  relocated: '줄 번호 불일치',
+  relocated: '검증됨, 줄 번호 정정',
   mismatch: '불일치',
   'no-excerpt': '발췌 없음, 줄 내용 미검증',
   'out-of-range': '줄 범위 초과',
@@ -94,17 +94,18 @@ export async function verifyEvidence(draft: string, projectPath: string | undefi
   let verified = 0;
   for (const entry of entries) {
     const path = isAbsolute(entry.path) ? resolve(entry.path) : resolve(projectPath, entry.path);
-    const head = `- \`${entry.path}:${entry.start}${entry.end > entry.start ? `-${entry.end}` : ''}\`${entry.claim ? ` — ${entry.claim}` : ''}`;
-    if (blocked(path) || !allowed.some(root => inside(root, path))) { out.push(`${head} [읽기 제외: 허용 범위 밖이거나 비밀 파일]`); continue; }
+    const head = (start: number, end: number) => `- \`${entry.path}:${start}${end > start ? `-${end}` : ''}\`${entry.claim ? ` — ${entry.claim}` : ''}`;
+    if (blocked(path) || !allowed.some(root => inside(root, path))) { out.push(`${head(entry.start, entry.end)} [읽기 제외: 허용 범위 밖이거나 비밀 파일]`); continue; }
     let file: string[];
     try {
-      if ((await stat(path)).size > MAX_BYTES) { out.push(`${head} [검증 불가: 파일이 너무 큼]`); continue; }
+      if ((await stat(path)).size > MAX_BYTES) { out.push(`${head(entry.start, entry.end)} [검증 불가: 파일이 너무 큼]`); continue; }
       file = (await readFile(path, 'utf8')).split(/\r?\n/);
-    } catch { out.push(`${head} [파일 없음]`); continue; }
+    } catch { out.push(`${head(entry.start, entry.end)} [파일 없음]`); continue; }
     const check = checkEntry(entry, file);
-    if (check.status === 'verified') verified++;
-    const at = check.status === 'relocated' ? ` (발췌는 ${check.start}-${check.end}줄에 있음)` : check.status === 'mismatch' ? ' (인용한 줄의 실제 내용은 아래와 같음)' : '';
-    out.push(`${head} [${STATUS[check.status]}]${at}${fenced(check.lines)}`);
+    if (check.status === 'verified' || check.status === 'relocated') verified++;
+    const corrected = check.status === 'relocated';
+    const at = corrected ? ` (원래 인용: ${entry.start}${entry.end > entry.start ? `-${entry.end}` : ''})` : check.status === 'mismatch' ? ' (인용한 줄의 실제 내용은 아래와 같음)' : '';
+    out.push(`${head(check.start, check.end)} [${STATUS[check.status]}${corrected ? `: 실제 ${check.start}-${check.end}` : ''}]${at}${fenced(check.lines)}`);
   }
   return `시스템이 디스크와 대조한 로컬 근거 (검증됨 ${verified}/${entries.length}):\n${out.join('\n')}`;
 }

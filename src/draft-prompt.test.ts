@@ -8,9 +8,18 @@ const debateSource = readFileSync(new URL('./debate.ts', import.meta.url), 'utf8
 describe('follow-up proposal prompt', () => {
   it('preserves the first draft structure and verified evidence with justified minimal changes', () => {
     expect(debateSource).toContain('첫 초안의 구조(질문 항목별 소제목, 참고 대상–우리 쪽 대응표)');
-    expect(debateSource).toContain('[검증됨]으로 표시된 로컬 근거를 유지');
+    expect(debateSource).toContain("검증 표시가 '검증됨'으로 시작하는 로컬 근거를 유지");
+    expect(debateSource).toContain('줄 번호 정정 항목은 정정된 실제 줄을 인용');
     expect(debateSource).toContain('필요한 부분만 수정하라. 새로 쓰지 말고 근거가 없는 주장을 더하지 마라');
     expect(debateSource).toContain('바꾼 부분은 그 이유를 한 줄로 표시하라');
+  });
+});
+
+describe('evidence note', () => {
+  it('accepts corrected verified entries and cites the corrected lines', () => {
+    expect(debateSource).toContain("검증 표시가 '검증됨'으로 시작하는 항목만 사실로 취급하라");
+    expect(debateSource).toContain('줄 번호 정정 항목은 정정된 실제 줄을 인용하라');
+    expect(debateSource).not.toContain('[줄 번호 불일치]');
   });
 });
 
