@@ -45,6 +45,14 @@ describe('analysisConclusionPrompt', () => {
     expect(withEvidence).toContain("검증 표시가 '검증됨'으로 시작하는 항목의 `파일:줄`");
     expect(withEvidence).toContain('줄 번호 정정 항목은 정정된 실제 줄을 인용하라');
     expect(withEvidence).toContain('그 외 인용은 미확인으로 표시하라');
-    expect(withEvidence).toContain('"저장소에서 확인하지 못했다"처럼 써라');
+    expect(withEvidence).toContain('"저장소에서 확인하지 못했다"처럼 사실만 서술하라');
+  });
+  it('uses short evidence labels and forbids process wording in the final answer', () => {
+    expect(prompt).toContain('"확인"·"추정"·"판단 기준" 같은 짧은 라벨만');
+    expect(prompt).toContain('"저장소에서 확인하지 못했다"처럼 사실만 서술하라');
+    expect(prompt).toContain('"토론", "제시된 발췌", "제시된 인용", "초안에서"');
+    expect(prompt).toContain('항목당 2~3줄로 줄이되');
+    expect(prompt).toContain('결론에 영향을 주는 항목은 유지');
+    expect(prompt).toContain('구현 계획·파일별 변경·롤백 절차·검증 명령은 쓰지 마라');
   });
 });
