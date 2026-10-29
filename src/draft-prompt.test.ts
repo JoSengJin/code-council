@@ -1,7 +1,18 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { firstDraftPrompt } from './draft-prompt.js';
 
 const topic = 'scripts/test3를 기점으로 공통 Shell처럼 SSR/CSR 구조를 재설계 (참고 저장소: C:\\work\\shell-repo)';
+const debateSource = readFileSync(new URL('./debate.ts', import.meta.url), 'utf8');
+
+describe('follow-up proposal prompt', () => {
+  it('preserves the first draft structure and verified evidence with justified minimal changes', () => {
+    expect(debateSource).toContain('첫 초안의 구조(질문 항목별 소제목, 참고 대상–우리 쪽 대응표)');
+    expect(debateSource).toContain('[검증됨]으로 표시된 로컬 근거를 유지');
+    expect(debateSource).toContain('필요한 부분만 수정하라. 새로 쓰지 말고 근거가 없는 주장을 더하지 마라');
+    expect(debateSource).toContain('바꾼 부분은 그 이유를 한 줄로 표시하라');
+  });
+});
 
 describe('firstDraftPrompt', () => {
   const prompt = firstDraftPrompt(topic, 'C:\\work\\app', '');
