@@ -121,6 +121,16 @@ describe('firstDraftPrompt', () => {
     });
   });
 
+  it('requires one local evidence entry per cited line range', () => {
+    for (const kind of ['analysis', 'implementation'] as const) {
+      const p = firstDraftPrompt('주제', 'C:\\work\\app', '', kind);
+      expect(p).toContain('본문에서 인용한 줄 범위마다 이 블록에 항목을 하나씩 두고');
+      expect(p).toContain('블록에 없는 줄 범위는 본문에서 인용하지 마라');
+      expect(p).toContain('`파일명:줄`');
+      expect(p).toContain('코드 블록(15줄 이내)');
+    }
+  });
+
   it('forbids claiming full redesign from one interpretation', () => {
     expect(prompt).toContain('끝났다고 결론 내리지 마라');
   });
