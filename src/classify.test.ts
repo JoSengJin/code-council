@@ -36,7 +36,14 @@ describe('analysisConclusionPrompt', () => {
     expect(prompt).toContain('{"index":1}');
   });
   it('asks for file citations only with a project', () => {
-    expect(prompt).toContain('`경로`');
-    expect(analysisConclusionPrompt('주제', false, [])).not.toContain('`경로`');
+    expect(prompt).toContain('`파일:줄`');
+    expect(analysisConclusionPrompt('주제', false, [])).not.toContain('`파일:줄`');
+  });
+  it('retains decision-relevant reference mappings and verified line citations', () => {
+    const withEvidence = analysisConclusionPrompt('핵심만', true, [], '[검증됨] src/example.ts:4');
+    expect(withEvidence).toContain('결론에 영향을 주는 항목은 유지하고 설명만 줄여라');
+    expect(withEvidence).toContain('[검증됨]으로 표시된 `파일:줄`');
+    expect(withEvidence).toContain('그 외 인용은 미확인으로 표시하라');
+    expect(withEvidence).toContain('"저장소에서 확인하지 못했다"처럼 써라');
   });
 });

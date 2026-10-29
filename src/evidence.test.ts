@@ -112,6 +112,6 @@ describe('prompts', () => {
   });
   it('passes verified evidence into the analysis conclusion', () => {
     expect(analysisConclusionPrompt('주제', true, [], '시스템이 디스크와 대조한 로컬 근거')).toContain('[검증됨] 항목만 사실로');
-    expect(analysisConclusionPrompt('주제', true, [])).not.toContain('[검증됨]');
+    expect(analysisConclusionPrompt('주제', true, [])).not.toContain('[검증됨] 항목만 사실로');
   });
 });
