@@ -28,8 +28,9 @@ describe('analysisConclusionPrompt', () => {
   const prompt = analysisConclusionPrompt('A와 B를 대조해 이점과 주의점', true, [{ index: 1 }]);
   it('answers the question and excludes implementation plan material', () => {
     expect(prompt).toContain('원래 질문: A와 B를 대조해 이점과 주의점');
-    expect(prompt).toContain('## 이점');
-    expect(prompt).toContain('## 고민할 점과 주의점');
+    expect(prompt).toContain('질문이 요구한 항목');
+    expect(prompt).toContain('그대로 소제목으로');
+    expect(prompt).not.toMatch(/## 이점|trpc|tRPC|Cal\.diy/);
     expect(prompt).toContain('구현 계획·파일별 변경·롤백 절차·검증 명령은 쓰지 마라');
     expect(prompt).toContain('토론 과정');
     expect(prompt).toContain('{"index":1}');

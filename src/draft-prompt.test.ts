@@ -64,6 +64,31 @@ describe('firstDraftPrompt', () => {
     expect(prompt).toContain('node_modules');
   });
 
+  describe('analysis kind', () => {
+    const analysis = firstDraftPrompt('A 방식을 참고해 B를 대조하고 장점과 제약을 핵심만', 'C:\\work\\app', '', 'analysis');
+    it('answers directly in the shape the question asks, without process narration', () => {
+      expect(analysis).toContain('과정, 확인 단계, 경계 분석은 서술하지 말고');
+      expect(analysis).toContain('질문이 요구한 항목');
+      expect(analysis).toContain('"핵심만"');
+      expect(analysis).not.toContain('각 단계의 결과를 초안 앞부분에');
+    });
+    it('picks a default interpretation instead of listing equal alternatives', () => {
+      expect(analysis).toContain('가장 개연성 높은 해석을 기본으로');
+      expect(analysis).toContain('같은 비중으로 나열하지 마라');
+      expect(analysis).not.toContain('같은 비중의 대안');
+    });
+    it('ties external references to concrete application, keeps evidence rules, no hardcoding', () => {
+      expect(analysis).toContain('웹 검색으로 확인하고 URL을 적어라');
+      expect(analysis).toContain('우리 상황의 어디에 어떻게 적용');
+      expect(analysis).toContain('로컬 파일·외부 원문·추정으로 구분');
+      expect(analysis).not.toMatch(/trpc|cal\.diy|shr-ffw|api-client/i);
+    });
+    it('works without a project and defaults to the implementation protocol otherwise', () => {
+      expect(firstDraftPrompt('주제', undefined, '', 'analysis')).toContain('저장소 검증을 주장하지 마라');
+      expect(firstDraftPrompt('주제', 'C:\\work\\app', '')).toContain('관련 파일 확인');
+    });
+  });
+
   it('forbids claiming full redesign from one interpretation', () => {
     expect(prompt).toContain('끝났다고 결론 내리지 마라');
   });

@@ -30,16 +30,16 @@ export function graph(onEvent: (sessionId:string,event:unknown)=>void, signal?: 
   return new StateGraph(State)
     .addNode('proposalNode',async state=>{
       const first=state.session.rounds.length===0;
-      const references=first&&process.env.MOCK_PROVIDERS!=='true'?await collectReferences(state.session.topic,signal):'';
+      // 첫 초안 형식이 주제 유형에 따라 달라지므로 분류를 먼저 한다(짧은 호출). mock은 기존 구현형 흐름을 유지한다.
+      const kind:TopicKind|undefined=state.session.kind??(first?(process.env.MOCK_PROVIDERS==='true'?'implementation':await classifyTopic(gemini,state.session.topic,signal)):undefined);
+      const session=kind===state.session.kind?state.session:{...state.session,kind};
+      if(session!==state.session)saveSession(session);
+      const references=first&&process.env.MOCK_PROVIDERS!=='true'?await collectReferences(session.topic,signal):'';
       const prompt=first
-        ?firstDraftPrompt(state.session.topic,state.session.projectPath,references)
+        ?firstDraftPrompt(session.topic,session.projectPath,references,kind)
         :`개발 주제: ${state.session.topic}\n이전 라운드: ${JSON.stringify(state.session.rounds.at(-1))}\n남은 쟁점: ${state.unresolved.join('; ')||'없음'}\nCodex의 첫 초안을 출발점으로 반박과 재반론을 반영해 개선안을 제안하라.`;
-      const draft=call(first?codex(state.session):gemini,prompt,state.session,state.session.rounds.length+1,'proposal');
-      if(!first||state.session.kind)return {proposal:(await draft).result.text};
-      // 첫 초안과 병렬로 주제 유형을 분류한다. mock은 기존 구현형 흐름을 유지한다.
-      const [kind,drafted]=await Promise.all([process.env.MOCK_PROVIDERS==='true'?Promise.resolve<TopicKind>('implementation'):classifyTopic(gemini,state.session.topic,signal),draft]);
-      const session={...state.session,kind}; saveSession(session);
-      return {proposal:drafted.result.text,session};
+      const proposal=(await call(first?codex(session):gemini,prompt,session,session.rounds.length+1,'proposal')).result.text;
+      return session===state.session?{proposal}:{proposal,session};
     })
     .addNode('criticismNode',async state=>({criticism:(await call(nemotron,`원래 질문: ${state.session.topic}\n아래 설계가 원래 질문에 직접 답하는지 먼저 판단하고, 벗어났으면 그 점을 첫 반박으로 제시하라. 이어서 기술적 결함, 보안, 성능, 반례를 구체적으로 반박하라. 초안의 "확인한 사실"과 "추정"을 구분해 점검하고, 근거 없이 단정한 외부 오픈소스 주장과 "추정"으로 표시된 주장을 우선 반박하라. 새 논거가 없으면 반복이라고 밝혀라.\n${state.proposal}`,state.session,state.session.rounds.length+1,'criticism')).result.text}))
     .addNode('rebuttalNode',async state=>({rebuttal:(await call(gemini,`원래 질문: ${state.session.topic}\n제안: ${state.proposal}\n반박: ${state.criticism}\n수용 여부와 수정된 설계를 명확히 답하라. 설계는 원래 질문에 직접 답해야 하며, 확인하지 못한 외부 내용은 계속 "추정"으로 표시하라.`,state.session,state.session.rounds.length+1,'rebuttal')).result.text}))
