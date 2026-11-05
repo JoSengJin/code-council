@@ -47,6 +47,13 @@ describe('analysisConclusionPrompt', () => {
     expect(withEvidence).toContain('그 외 인용은 미확인으로 표시하라');
     expect(withEvidence).toContain('"저장소에서 확인하지 못했다"처럼 사실만 서술하라');
   });
+  it('forbids placeholder citations, keeps external urls and separate headings', () => {
+    expect(prompt).toContain('인용은 반드시 `파일명:줄`로 쓰고, 해당하는 검증된 항목이 없으면 인용을 생략하라');
+    expect(prompt).toContain('경로 자리표시자나 물음표 같은 임시 표기는 쓰지 마라');
+    expect(prompt).not.toContain('전체 경로는 쓰지 않아도 된다');
+    expect(prompt).toContain('외부 원문 URL은 해당 항목 끝에 링크로 남기고');
+    expect(prompt).toContain('소제목을 합치지 마라');
+  });
   it('uses short evidence labels and forbids process wording in the final answer', () => {
     expect(prompt).toContain('"확인"·"추정"·"판단 기준" 같은 짧은 라벨만');
     expect(prompt).toContain('"저장소에서 확인하지 못했다"처럼 사실만 서술하라');

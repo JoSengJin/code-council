@@ -120,6 +120,13 @@ describe('prompts', () => {
     expect(analysis).toContain('더 작은 안이 있으면 함께 비교');
     expect(analysis).not.toMatch(/trpc|cal\.diy|api-client/i);
   });
+  it('keeps requested sections separate and states decision criteria in the analysis draft', () => {
+    const analysis = firstDraftPrompt('A를 참고해 B를 개선', 'C:\\work\\app', '', 'analysis');
+    expect(analysis).toContain('질문이 따로 요구한 항목끼리는 소제목을 합치지 마라');
+    expect(analysis).toContain('사용자가 결정해야 할 선택 기준');
+    expect(analysis).toContain('직접 열어 본 원문만 확인한 것으로 표시하라');
+    expect(analysis).not.toMatch(/trpc|cal\.diy|api-client/i);
+  });
   it('passes verified evidence into the analysis conclusion', () => {
     expect(analysisConclusionPrompt('주제', true, [], '시스템이 디스크와 대조한 로컬 근거')).toContain("검증 표시가 '검증됨'으로 시작하는 항목만 사실로");
     expect(analysisConclusionPrompt('주제', true, [])).not.toContain("검증 표시가 '검증됨'으로 시작하는 항목만 사실로");
