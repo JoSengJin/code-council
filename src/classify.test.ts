@@ -44,6 +44,8 @@ describe('analysisConclusionPrompt', () => {
     expect(prompt).toContain('모든 주장에 라벨을 붙여라');
     expect(prompt).toContain('추정(일반 지식)');
     expect(prompt).toContain('직접 보여 주는 줄에만 붙이고');
+    expect(prompt).toContain('URL 없이 "확인"만 적지 마라');
+    expect(prompt).toContain('커밋을 고정하지 못한 원문');
   });
   it('retains decision-relevant reference mappings and verified line citations', () => {
     const withEvidence = analysisConclusionPrompt('핵심만', true, [], '[검증됨] src/example.ts:4');
