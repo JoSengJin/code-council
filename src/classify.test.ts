@@ -39,6 +39,12 @@ describe('analysisConclusionPrompt', () => {
     expect(prompt).toContain('`파일:줄`');
     expect(analysisConclusionPrompt('주제', false, [])).not.toContain('`파일:줄`');
   });
+  it('requires premises section, labels on every claim, and directly supporting citations', () => {
+    expect(prompt).toContain('"미확인·전제" 항목을 반드시 두고');
+    expect(prompt).toContain('모든 주장에 라벨을 붙여라');
+    expect(prompt).toContain('추정(일반 지식)');
+    expect(prompt).toContain('직접 보여 주는 줄에만 붙이고');
+  });
   it('retains decision-relevant reference mappings and verified line citations', () => {
     const withEvidence = analysisConclusionPrompt('핵심만', true, [], '[검증됨] src/example.ts:4');
     expect(withEvidence).toContain('결론에 영향을 주는 항목은 유지하고 설명만 줄여라');
