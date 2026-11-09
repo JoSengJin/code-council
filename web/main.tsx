@@ -32,7 +32,7 @@ function App(){
   const titleTimer=useRef<ReturnType<typeof setInterval>|null>(null);
   const [setup,setSetup]=useState<{gemini:boolean;nemotron:boolean}|null>(null);const [geminiKey,setGeminiKey]=useState('');const [nemotronKey,setNemotronKey]=useState('');const [nemotronProvider,setNemotronProvider]=useState<'OPENROUTER_API_KEY'|'NVIDIA_API_KEY'>('OPENROUTER_API_KEY');
   type AgentInfo={codex:{installed:boolean;loggedIn:boolean|null};claude:{installed:boolean};lead:Lead;recommended:Lead|null};
-  const [agents,setAgents]=useState<AgentInfo|null>(null);const [agentsReady,setAgentsReady]=useState(false);const [agentsDone,setAgentsDone]=useState(false);const [checkingAgents,setCheckingAgents]=useState(false);const [agentChoice,setAgentChoice]=useState<Lead|null>(null);const [recheckFailed,setRecheckFailed]=useState(false);
+  const [agents,setAgents]=useState<AgentInfo|null>(null);const [agentsReady,setAgentsReady]=useState(false);const [agentsDone,setAgentsDone]=useState(false);const [checkingAgents,setCheckingAgents]=useState(false);const [agentChoice,setAgentChoice]=useState<Lead|null>(null);const [recheckFailed,setRecheckFailed]=useState(false);const [forceSetup,setForceSetup]=useState(false);
   const conversationRef=useRef<HTMLDivElement>(null);const followRef=useRef(true);const startingRef=useRef(false);const [starting,setStarting]=useState(false);
   const refresh=async()=>{const [projectResponse,sessionResponse,perfResponse,usageResponse]=await Promise.all([fetch('/api/projects'),fetch('/api/sessions'),fetch('/api/performance'),fetch('/api/usage')]);setProjects(await projectResponse.json());setSessions(await sessionResponse.json());setPerf(await perfResponse.json());setUsage(await usageResponse.json());};
   const load=async(id:string)=>{const s=await (await fetch(`/api/sessions/${id}`)).json();setCurrent(s);};
@@ -115,8 +115,8 @@ function App(){
   const agentOk=!agents||(agents.lead==='claude'?agents.claude.installed:agents.codex.installed&&agents.codex.loggedIn!==false);
   const keysMissing=!!setup&&(setup.gemini||setup.nemotron);
   const bothAgents=!!agents&&agents.codex.installed&&agents.claude.installed&&agents.codex.loggedIn!==false;
-  const showAgentStep=!!agents&&(!agentOk||(keysMissing&&bothAgents&&!agentsDone));
-  const chooseLead=async(lead:Lead)=>{const result=await post('/api/agents/lead',{lead});if(result){setAgents(a=>a?{...a,lead}:a);setAgentsDone(true);}};
+  const showAgentStep=!!agents&&(!agentOk||(keysMissing&&bothAgents&&!agentsDone)||forceSetup);
+  const chooseLead=async(lead:Lead)=>{const result=await post('/api/agents/lead',{lead});if(result){setAgents(a=>a?{...a,lead}:a);setAgentsDone(true);setForceSetup(false);}};
   const recheck=async()=>{setRecheckFailed(false);const next=await checkAgents();if(!next||(next.lead==='claude'?!next.claude.installed:!next.codex.installed||next.codex.loggedIn===false))setRecheckFailed(true);};
   const agentStep=agents&&<>
     <h2>1단계 · 에이전트 확인</h2>
@@ -124,6 +124,10 @@ function App(){
       <p>Codex와 Claude를 모두 사용할 수 있습니다. 토론 주관을 고르세요. 기본은 Codex이며, Claude는 설치만 확인했고 로그인은 첫 토론에서 확인됩니다.</p>
       <label>토론 주관<select value={agentChoice??agents.lead} onChange={e=>setAgentChoice(e.target.value as Lead)}><option value="codex">Codex{agents.recommended==='codex'?' (권장)':''}</option><option value="claude">Claude</option></select></label>
       <button className="primary" type="button" onClick={()=>void chooseLead(agentChoice??agents.lead)}>이 에이전트로 계속</button>
+    </>:agentOk?<>
+      <p>{agents.lead==='claude'?'Claude':'Codex'}를 토론 주관으로 사용할 수 있습니다.{agents.lead==='claude'?' Claude는 설치만 확인했고 로그인은 첫 토론에서 확인됩니다.':agents.codex.loggedIn===null?' Codex 로그인 상태는 확인하지 못했습니다.':' ChatGPT 계정 로그인도 확인되었습니다.'}</p>
+      {!agents.codex.installed&&<p>Codex CLI는 찾을 수 없습니다.</p>}{!agents.claude.installed&&<p>Claude Code는 찾을 수 없습니다.</p>}
+      <button type="button" disabled={checkingAgents} onClick={()=>void recheck()}>{checkingAgents?'확인 중…':'다시 확인'}</button>
     </>:agents.codex.installed&&agents.codex.loggedIn===false?<>
       <p>Codex는 설치되어 있지만 ChatGPT 계정에 로그인되어 있지 않습니다. 터미널에서 <code>codex login</code>을 실행해 로그인한 뒤 다시 확인하세요. 앱은 로그인을 대신 실행하지 않습니다.</p>
       <button className="primary" type="button" disabled={checkingAgents} onClick={()=>void recheck()}>{checkingAgents?'확인 중…':'다시 확인'}</button>
@@ -141,6 +145,7 @@ function App(){
       <ul><li>Claude: <code>npm i -g @anthropic-ai/claude-code</code></li><li>Codex: <a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex CLI 안내</a> (설치 후 <code>codex login</code>)</li></ul>
       <button className="primary" type="button" disabled={checkingAgents} onClick={()=>void recheck()}>{checkingAgents?'확인 중…':'다시 확인'}</button>
     </>}
+    {forceSetup&&<button type="button" onClick={()=>setForceSetup(false)}>돌아가기</button>}
     {recheckFailed&&<p className="hint">아직 찾지 못했습니다. 설치 직후라면 서버를 재시작하거나, <code>.env</code>의 <code>CODEX_BIN</code>/<code>CLAUDE_BIN</code>에 실행 파일 절대 경로를 지정한 뒤 다시 확인하세요.</p>}
   </>;
   if (!agentsReady) return <main className="setup-page"><div className="setup-card"><h1>Code Council 설정</h1><p>에이전트 상태를 확인하는 중입니다…</p></div></main>;
@@ -151,6 +156,7 @@ function App(){
       <h1>Code Council</h1>
       {notificationPermission==='default'&&<button className="nav" onClick={()=>void enableNotifications()}>🔔 데스크톱 알림 켜기</button>}
       <button className="nav" onClick={()=>{setSelectedProjectId(null);setView('chat');setCurrent(null)}}>＋ 새 토론</button>
+      <button className="nav" onClick={()=>{setRecheckFailed(false);setForceSetup(true);void checkAgents();}}>초기 설정 보기</button>
       <button className="nav" onClick={()=>setView('performance')}>에이전트 사용량 · 성능</button>
       <button className="nav" onClick={()=>setView('archive')}>보관함 ({sessions.filter(s=>s.archivedAt).length+archivedProjects.length})</button>
       <div className="sidebar-heading"><h2>프로젝트</h2><span className="heading-actions"><button aria-label={allCollapsed?'모두 펼치기':'모두 접기'} title={allCollapsed?'모두 펼치기':'모두 접기'} onClick={()=>saveCollapsed(allCollapsed?new Set():new Set(activeProjects.map(p=>p.id)))}>{allCollapsed?'▸▸':'▾▾'}</button></span><button aria-label="프로젝트 추가" title="프로젝트 추가" onClick={()=>setShowProjectForm(value=>!value)}>＋</button></div>
