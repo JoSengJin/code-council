@@ -1,8 +1,8 @@
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { missingKeys, saveKeys } from './setup.js';
+import { missingKeys, saveKeys, saveLead } from './setup.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'code-council-setup-'));
 afterEach(() => rmSync(join(dir, '.env'), { force: true }));
@@ -26,5 +26,27 @@ describe('API key setup', () => {
     expect(() => saveKeys({ GEMINI_API_KEY: 'gemini-key' }, env, path)).toThrow();
     expect(() => saveKeys({ GEMINI_API_KEY: 'gemini\nkey', NVIDIA_API_KEY: 'nvidia-key' }, env, path)).toThrow();
     expect(readFileSync(path, 'utf8')).toBe('PORT=3001\n');
+  });
+
+  it('saves the lead agent to DEFAULT_LEAD atomically and applies it', () => {
+    const env: NodeJS.ProcessEnv = {};
+    const path = join(dir, '.env');
+    writeFileSync(path, 'PORT=3001\nDEFAULT_LEAD="codex"\n');
+    expect(saveLead('claude', env, path)).toBe('claude');
+    expect(readFileSync(path, 'utf8')).toBe('PORT=3001\nDEFAULT_LEAD="claude"\n');
+    expect(env.DEFAULT_LEAD).toBe('claude');
+    expect(readdirSync(dir).filter(name => name.endsWith('.tmp'))).toEqual([]);
+    if (process.platform !== 'win32') expect(statSync(path).mode & 0o777).toBe(0o600);
+  });
+
+  it('creates .env when missing and rejects invalid leads without changes', () => {
+    const env: NodeJS.ProcessEnv = {};
+    const path = join(dir, '.env');
+    saveLead('codex', env, path);
+    expect(readFileSync(path, 'utf8')).toBe('DEFAULT_LEAD="codex"\n');
+    delete env.DEFAULT_LEAD;
+    for (const bad of ['gpt', '', 'claude\nGEMINI_API_KEY=x', undefined, 1]) expect(() => saveLead(bad, env, path)).toThrow();
+    expect(readFileSync(path, 'utf8')).toBe('DEFAULT_LEAD="codex"\n');
+    expect(env.DEFAULT_LEAD).toBeUndefined();
   });
 });

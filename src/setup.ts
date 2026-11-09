@@ -17,8 +17,22 @@ export function saveKeys(keys: Keys, env: NodeJS.ProcessEnv = process.env, path 
   }
   const next = { ...env, ...keys };
   if (Object.values(missingKeys(next)).some(Boolean)) throw new Error('Gemini 키와 OpenRouter 또는 NVIDIA 키가 필요합니다.');
+  upsertEnv(keys as Record<string, string>, path);
+  Object.assign(env, keys);
+  return missingKeys(env);
+}
+
+export function saveLead(lead: unknown, env: NodeJS.ProcessEnv = process.env, path = resolve('.env')) {
+  if (lead !== 'codex' && lead !== 'claude') throw new Error('토론 주관은 codex 또는 claude만 선택할 수 있습니다.');
+  upsertEnv({ DEFAULT_LEAD: lead }, path);
+  env.DEFAULT_LEAD = lead;
+  return lead;
+}
+
+// .env의 KEY=값 줄을 갱신하거나 추가하고 임시 파일 교체로 원자적으로 저장한다(0o600).
+function upsertEnv(values: Record<string, string>, path: string) {
   let content = existsSync(path) ? readFileSync(path, 'utf8') : '';
-  for (const [name, value] of Object.entries(keys)) {
+  for (const [name, value] of Object.entries(values)) {
     const line = `${name}=${JSON.stringify(value.trim())}`;
     const pattern = new RegExp(`^${name}=.*$`, 'gm');
     content = pattern.test(content) ? content.replace(pattern, line) : `${content}${content && !content.endsWith('\n') ? '\n' : ''}${line}\n`;
@@ -31,6 +45,4 @@ export function saveKeys(keys: Keys, env: NodeJS.ProcessEnv = process.env, path 
     rmSync(temporary, { force: true });
     throw error;
   }
-  Object.assign(env, keys);
-  return missingKeys(env);
 }
