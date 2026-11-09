@@ -26,7 +26,7 @@ export function performance(sessionId?: string) {
     samples:scored.map(m=>({ criticismId:m.criticismId, score:m.score, latencyMs:m.latencyMs })), raw:all };
 }
 export function agentUsage() {
-  return ['codex','gemini','nemotron'].map(provider=>{
+  return ['codex','claude','gemini','nemotron'].map(provider=>{
     const calls=metrics().filter(m=>m.provider===provider&&!m.error);
     const sum=(kind:'input'|'output')=>calls.some(m=>m.usage[kind]!==null)?calls.reduce((total,m)=>total+(m.usage[kind]||0),0):null;
     return {provider,calls:calls.length,inputTokens:sum('input'),outputTokens:sum('output')};

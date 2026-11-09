@@ -7,6 +7,7 @@ import { Score, type Round, type Session } from './types.js';
 import { saveSession } from './db.js';
 import { writeReports } from './reports.js';
 import { CodexBridge } from './codex.js';
+import { ClaudeBridge } from './claude.js';
 import { collectReferences } from './references.js';
 import { analysisConclusionPrompt, firstDraftPrompt } from './draft-prompt.js';
 import { classifyTopic } from './classify.js';
@@ -21,10 +22,12 @@ const State = Annotation.Root({ session: Annotation<Session>, proposal: Annotati
 const checkpointer = new SqliteCheckpoint(resolve('data/graph.sqlite'));
 export const deleteGraphThread = (id:string) => checkpointer.deleteThread(id);
 const json = (text: string) => { const start=text.indexOf('{'), end=text.lastIndexOf('}'); if(start<0||end<start) throw new Error('Judge did not return JSON'); return JSON.parse(text.slice(start,end+1)); };
-export function graph(onEvent: (sessionId:string,event:unknown)=>void, signal?: AbortSignal, bridge?: CodexBridge) {
+export function graph(onEvent: (sessionId:string,event:unknown)=>void, signal?: AbortSignal, bridge?: CodexBridge, claudeBridge?: ClaudeBridge) {
   const {gemini,nemotron,judge} = providers();
-  const codex=(session:Session,explore=true):Provider=>({name:'codex',model:'Codex App Server',complete:(prompt,signal,onChunk)=>
-    process.env.MOCK_PROVIDERS==='true'?gemini.complete(prompt,signal,onChunk):bridge!.propose(prompt,session.projectPath,signal,onChunk,explore)});
+  // 토론 주관(초안·결론·계획) 에이전트. 세션의 lead에 따라 Codex 또는 Claude가 맡는다.
+  const codex=(session:Session,explore=true):Provider=>session.lead==='claude'
+    ?{name:'claude',model:'Claude Code CLI',complete:(prompt,signal,onChunk)=>process.env.MOCK_PROVIDERS==='true'?gemini.complete(prompt,signal,onChunk):claudeBridge!.propose(prompt,session.projectPath,signal,onChunk,explore)}
+    :{name:'codex',model:'Codex App Server',complete:(prompt,signal,onChunk)=>process.env.MOCK_PROVIDERS==='true'?gemini.complete(prompt,signal,onChunk):bridge!.propose(prompt,session.projectPath,signal,onChunk,explore)};
   const call = async (provider: Provider,prompt:string,s:Session,round:number,phase:string) => {
     const messageId=randomUUID();
     onEvent(s.id,{type:'message-start',messageId,role:phase==='judge'?'judge':provider.name,round,phase});
@@ -42,7 +45,7 @@ export function graph(onEvent: (sessionId:string,event:unknown)=>void, signal?: 
       const references=first&&process.env.MOCK_PROVIDERS!=='true'?await collectReferences(session.topic,signal):'';
       const prompt=first
         ?firstDraftPrompt(session.topic,session.projectPath,references,kind)
-        :`개발 주제: ${state.session.topic}\n이전 라운드: ${JSON.stringify(state.session.rounds.at(-1))}\n남은 쟁점: ${state.unresolved.join('; ')||'없음'}\nCodex의 첫 초안을 출발점으로 반박과 재반론을 반영해 개선안을 제안하라. 첫 초안의 구조(질문 항목별 소제목, 참고 대상–우리 쪽 대응표)와 검증 표시가 '검증됨'으로 시작하는 로컬 근거를 유지하고, 줄 번호 정정 항목은 정정된 실제 줄을 인용하며 필요한 부분만 수정하라. 새로 쓰지 말고 근거가 없는 주장을 더하지 마라. 반박을 수용해 바꾼 부분은 그 이유를 한 줄로 표시하라.${evidenceNote(session,state.evidence)}`;
+        :`개발 주제: ${state.session.topic}\n이전 라운드: ${JSON.stringify(state.session.rounds.at(-1))}\n남은 쟁점: ${state.unresolved.join('; ')||'없음'}\n${session.lead==='claude'?'Claude':'Codex'}의 첫 초안을 출발점으로 반박과 재반론을 반영해 개선안을 제안하라. 첫 초안의 구조(질문 항목별 소제목, 참고 대상–우리 쪽 대응표)와 검증 표시가 '검증됨'으로 시작하는 로컬 근거를 유지하고, 줄 번호 정정 항목은 정정된 실제 줄을 인용하며 필요한 부분만 수정하라. 새로 쓰지 말고 근거가 없는 주장을 더하지 마라. 반박을 수용해 바꾼 부분은 그 이유를 한 줄로 표시하라.${evidenceNote(session,state.evidence)}`;
       const proposal=(await call(first?codex(session):gemini,prompt,session,session.rounds.length+1,'proposal')).result.text;
       const evidence=first?await verifyEvidence(proposal,session.projectPath,topicRoots(session.topic)):state.evidence;
       return session===state.session?{proposal,evidence}:{proposal,evidence,session};

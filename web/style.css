@@ -26,6 +26,8 @@ main{min-height:0}
 .composer:focus-within{border-color:#76a7e5}
 .composer textarea{min-height:54px;max-height:30vh;border:0;background:transparent;outline:none}
 .composer button{min-height:48px;white-space:nowrap}
+.lead-select{display:flex;flex-direction:column;gap:2px;font-size:11px;color:#9aa7b6}
+.lead-select select{min-height:30px}
 .empty-chat{display:flex;flex:1;flex-direction:column;justify-content:center;gap:24px;width:min(900px,100%);margin:auto;padding:28px}
 .empty-chat .welcome{margin:0;padding:0 10px}
 .markdown{overflow-wrap:anywhere;line-height:1.65}

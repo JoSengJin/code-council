@@ -56,3 +56,8 @@ Mock 테스트는 지정한 Next.js SSR/CSR 주제로 3라운드, Nemotron 호�
 - [NVIDIA Nemotron endpoint](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b/build)
 - [OpenRouter Nemotron 무료 endpoint](https://openrouter.ai/nvidia/nemotron-3.5-lightning:free)
 - [LangGraph.js](https://docs.langchain.com/oss/javascript/langgraph/thinking-in-langgraph)
+
+## 토론 주관 전환 (Codex ↔ Claude)
+
+새 토론을 시작할 때 입력창의 "토론 주관" 선택으로 첫 초안·최종 결론·실행계획을 맡을 에이전트(Codex 또는 Claude)를 고릅니다. 기본값은 `.env`의 `DEFAULT_LEAD`(미설정 시 codex)입니다.
+Claude 주관은 로컬 `claude` CLI(Claude Code)를 읽기 전용(Read/Grep/Glob/WebSearch/WebFetch)으로 호출하므로 먼저 `claude`로 로그인해 두세요. 경로·모델·추론 강도는 `CLAUDE_BIN`, `CLAUDE_MODEL`, `CLAUDE_EFFORT`로 지정합니다. 승인 후 코드 수정 실행은 항상 Codex가 맡습니다.
