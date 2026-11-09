@@ -61,3 +61,15 @@ Mock 테스트는 지정한 Next.js SSR/CSR 주제로 3라운드, Nemotron 호�
 
 새 토론을 시작할 때 입력창의 "토론 주관" 선택으로 첫 초안·최종 결론·실행계획을 맡을 에이전트(Codex 또는 Claude)를 고릅니다. 기본값은 `.env`의 `DEFAULT_LEAD`(미설정 시 codex)입니다.
 Claude 주관은 로컬 `claude` CLI(Claude Code)를 읽기 전용(Read/Grep/Glob/WebSearch/WebFetch)으로 호출하므로 먼저 `claude`로 로그인해 두세요. 경로·모델·추론 강도는 `CLAUDE_BIN`, `CLAUDE_MODEL`, `CLAUDE_EFFORT`로 지정합니다. 승인 후 코드 수정 실행은 항상 Codex가 맡습니다.
+
+### 최초 진입 흐름
+
+1. **에이전트 확인**: 화면을 열면 서버가 Codex와 Claude의 설치 여부(`--version`)와 Codex의 ChatGPT 로그인 여부를 한 번 점검합니다. 앱은 CLI 설치나 로그인을 대신 실행하지 않으며, 점검은 "다시 확인"을 눌렀을 때만 다시 실행됩니다. Claude는 설치만 확인하고 로그인은 첫 토론에서 확인됩니다.
+   - Codex 사용 가능(로그인 판별 불가 포함): 그대로 통과합니다. 둘 다 있으면 주관을 고르는 선택이 나옵니다.
+   - Codex 설치됨, 로그인 안 됨: `codex login` 안내와 "다시 확인"이 나옵니다. Claude가 있으면 "Claude로 진행"도 고를 수 있습니다.
+   - Codex 없음, Claude 있음: "Claude를 주관으로 저장"으로 `.env`의 `DEFAULT_LEAD`에 저장합니다.
+   - 둘 다 없음: 설치 안내와 "다시 확인"이 나옵니다. 설치 직후에도 찾지 못하면 서버를 재시작하거나 `CODEX_BIN`/`CLAUDE_BIN`을 지정하세요.
+2. **API 키 입력**: 에이전트 단계를 통과한 뒤 키가 없을 때만 표시됩니다.
+3. 에이전트와 키가 모두 준비되어 있으면 설정 화면은 건너뜁니다. 선택한 주관이 설치되지 않았으면 토론 시작이 409와 안내 문구로 거절됩니다.
+
+Codex 로그인 판별은 일회성 `codex app-server` 프로세스의 `account/read`(ChatGPT 로그인만 true)로 합니다. 이 방식의 실제 동작은 Codex가 설치된 환경에서 아직 검증하지 않았고, 조회 실패·시간 초과는 "판별 불가"로 처리해 막지 않습니다.
