@@ -31,6 +31,8 @@ function App(){
   const notifiedSessions=useRef(new Set<string>());
   const titleTimer=useRef<ReturnType<typeof setInterval>|null>(null);
   const [setup,setSetup]=useState<{gemini:boolean;nemotron:boolean}|null>(null);const [geminiKey,setGeminiKey]=useState('');const [nemotronKey,setNemotronKey]=useState('');const [nemotronProvider,setNemotronProvider]=useState<'OPENROUTER_API_KEY'|'NVIDIA_API_KEY'>('OPENROUTER_API_KEY');
+  type AgentInfo={codex:{installed:boolean;loggedIn:boolean|null};claude:{installed:boolean};lead:Lead;recommended:Lead|null};
+  const [agents,setAgents]=useState<AgentInfo|null>(null);const [agentsReady,setAgentsReady]=useState(false);const [agentsDone,setAgentsDone]=useState(false);const [checkingAgents,setCheckingAgents]=useState(false);const [agentChoice,setAgentChoice]=useState<Lead|null>(null);const [recheckFailed,setRecheckFailed]=useState(false);
   const conversationRef=useRef<HTMLDivElement>(null);const followRef=useRef(true);const startingRef=useRef(false);const [starting,setStarting]=useState(false);
   const refresh=async()=>{const [projectResponse,sessionResponse,perfResponse,usageResponse]=await Promise.all([fetch('/api/projects'),fetch('/api/sessions'),fetch('/api/performance'),fetch('/api/usage')]);setProjects(await projectResponse.json());setSessions(await sessionResponse.json());setPerf(await perfResponse.json());setUsage(await usageResponse.json());};
   const load=async(id:string)=>{const s=await (await fetch(`/api/sessions/${id}`)).json();setCurrent(s);};
@@ -50,6 +52,8 @@ function App(){
     }
   };
   const enableNotifications=async()=>setNotificationPermission(await Notification.requestPermission());
+  const checkAgents=async()=>{setCheckingAgents(true);try{const response=await fetch('/api/agents');if(!response.ok)throw new Error('에이전트 상태를 확인할 수 없습니다.');const next=await response.json() as AgentInfo;setAgents(next);setAgentChoice(null);return next;}catch{return null;}finally{setCheckingAgents(false);setAgentsReady(true);}};
+  useEffect(()=>{void checkAgents();},[]);
   useEffect(()=>{void refresh();void fetch('/api/setup').then(async response=>{if(!response.ok)throw new Error('설정 상태를 확인할 수 없습니다.');setSetup(await response.json());}).catch(e=>setError(String(e)));},[]);
   useEffect(()=>{const clearTitle=()=>{if(!document.hidden){if(titleTimer.current)clearInterval(titleTimer.current);titleTimer.current=null;document.title='Debate Dev System';}};document.addEventListener('visibilitychange',clearTitle);return()=>{document.removeEventListener('visibilitychange',clearTitle);if(titleTimer.current)clearInterval(titleTimer.current);};},[]);
   useEffect(()=>{if(view==='performance')void fetch('/api/limits').then(response=>response.json()).then(setLimits).catch(()=>setLimits(null));},[view]);
@@ -106,6 +110,39 @@ function App(){
   const activeProjects=projects.filter(p=>!p.archivedAt);const archivedProjects=projects.filter(p=>p.archivedAt);const allCollapsed=activeProjects.length>0&&activeProjects.every(p=>collapsed.has(p.id));
   const selectedProject=projects.find(p=>p.id===selectedProjectId);
   const showSession=(s:Session)=>{setSelectedProjectId(s.projectId||null);setCurrent(s);setView('chat');};
+  const agentOk=!agents||(agents.lead==='claude'?agents.claude.installed:agents.codex.installed&&agents.codex.loggedIn!==false);
+  const keysMissing=!!setup&&(setup.gemini||setup.nemotron);
+  const bothAgents=!!agents&&agents.codex.installed&&agents.claude.installed&&agents.codex.loggedIn!==false;
+  const showAgentStep=!!agents&&(!agentOk||(keysMissing&&bothAgents&&!agentsDone));
+  const chooseLead=async(lead:Lead)=>{const result=await post('/api/agents/lead',{lead});if(result){setAgents(a=>a?{...a,lead}:a);setAgentsDone(true);}};
+  const recheck=async()=>{setRecheckFailed(false);const next=await checkAgents();if(!next||(next.lead==='claude'?!next.claude.installed:!next.codex.installed||next.codex.loggedIn===false))setRecheckFailed(true);};
+  const agentStep=agents&&<>
+    <h2>1단계 · 에이전트 확인</h2>
+    {agentOk&&bothAgents?<>
+      <p>Codex와 Claude를 모두 사용할 수 있습니다. 토론 주관을 고르세요. 기본은 Codex이며, Claude는 설치만 확인했고 로그인은 첫 토론에서 확인됩니다.</p>
+      <label>토론 주관<select value={agentChoice??agents.lead} onChange={e=>setAgentChoice(e.target.value as Lead)}><option value="codex">Codex{agents.recommended==='codex'?' (권장)':''}</option><option value="claude">Claude</option></select></label>
+      <button className="primary" type="button" onClick={()=>void chooseLead(agentChoice??agents.lead)}>이 에이전트로 계속</button>
+    </>:agents.codex.installed&&agents.codex.loggedIn===false?<>
+      <p>Codex는 설치되어 있지만 ChatGPT 계정에 로그인되어 있지 않습니다. 터미널에서 <code>codex login</code>을 실행해 로그인한 뒤 다시 확인하세요. 앱은 로그인을 대신 실행하지 않습니다.</p>
+      <button className="primary" type="button" disabled={checkingAgents} onClick={()=>void recheck()}>{checkingAgents?'확인 중…':'다시 확인'}</button>
+      {agents.claude.installed&&<><p>또는 Claude를 주관으로 사용할 수 있습니다. Claude 로그인은 첫 토론에서 확인됩니다.</p><button type="button" onClick={()=>void chooseLead('claude')}>Claude로 진행</button></>}
+    </>:agents.lead==='claude'&&!agents.claude.installed&&agents.codex.installed?<>
+      <p>토론 주관이 Claude로 설정되어 있지만 Claude Code(<code>claude</code>)를 찾을 수 없습니다. Codex를 사용할 수 있습니다.</p>
+      <button className="primary" type="button" onClick={()=>void chooseLead('codex')}>Codex를 주관으로 사용</button>
+      <button type="button" disabled={checkingAgents} onClick={()=>void recheck()}>{checkingAgents?'확인 중…':'다시 확인'}</button>
+    </>:!agents.codex.installed&&agents.claude.installed?<>
+      <p>Codex CLI를 찾을 수 없습니다. Claude Code를 토론 주관으로 사용할 수 있습니다. Claude는 설치만 확인했고 로그인은 첫 토론에서 확인됩니다.</p>
+      <button className="primary" type="button" onClick={()=>void chooseLead('claude')}>Claude를 주관으로 저장</button>
+      <button type="button" disabled={checkingAgents} onClick={()=>void recheck()}>{checkingAgents?'확인 중…':'Codex 설치 후 다시 확인'}</button>
+    </>:<>
+      <p>사용할 수 있는 에이전트를 찾지 못했습니다. 하나 이상 설치하세요.</p>
+      <ul><li>Claude: <code>npm i -g @anthropic-ai/claude-code</code></li><li>Codex: <a href="https://learn.chatgpt.com/docs/codex/cli" target="_blank" rel="noreferrer">Codex CLI 안내</a> (설치 후 <code>codex login</code>)</li></ul>
+      <button className="primary" type="button" disabled={checkingAgents} onClick={()=>void recheck()}>{checkingAgents?'확인 중…':'다시 확인'}</button>
+    </>}
+    {recheckFailed&&<p className="hint">아직 찾지 못했습니다. 설치 직후라면 서버를 재시작하거나, <code>.env</code>의 <code>CODEX_BIN</code>/<code>CLAUDE_BIN</code>에 실행 파일 절대 경로를 지정한 뒤 다시 확인하세요.</p>}
+  </>;
+  if (!agentsReady) return <main className="setup-page"><div className="setup-card"><h1>Code Council 설정</h1><p>에이전트 상태를 확인하는 중입니다…</p></div></main>;
+  if (showAgentStep) return <main className="setup-page"><div className="setup-card"><h1>Code Council 설정</h1>{agentStep}{error&&<div className="error" role="alert">{error}</div>}</div></main>;
   if (!setup || setup.gemini || setup.nemotron) return <main className="setup-page"><div className="setup-card"><h1>Code Council 설정</h1>{!setup?<p>설정 상태를 확인하는 중입니다…</p>:<><p>멀티 턴 토론에 사용할 API 키를 등록하세요. 키는 이 컴퓨터의 <code>.env</code>에 저장되고 현재 서버에 바로 적용됩니다.</p><form onSubmit={e=>void saveSetup(e)}>{setup.gemini&&<label>Gemini API 키<input type="password" autoComplete="off" required value={geminiKey} onChange={e=>setGeminiKey(e.target.value)}/></label>}{setup.nemotron&&<><label>Nemotron 제공자<select value={nemotronProvider} onChange={e=>setNemotronProvider(e.target.value as 'OPENROUTER_API_KEY'|'NVIDIA_API_KEY')}><option value="OPENROUTER_API_KEY">OpenRouter</option><option value="NVIDIA_API_KEY">NVIDIA Build</option></select></label><label>{nemotronProvider==='OPENROUTER_API_KEY'?'OpenRouter':'NVIDIA Build'} API 키<input type="password" autoComplete="off" required value={nemotronKey} onChange={e=>setNemotronKey(e.target.value)}/></label></>}<button className="primary" type="submit">키 저장하고 시작</button></form></>}{error&&<div className="error" role="alert">{error}</div>}</div></main>;
   return <div className="shell">
     <aside>
