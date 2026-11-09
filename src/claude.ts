@@ -24,6 +24,11 @@ export function claudeArgs(env:NodeJS.ProcessEnv=process.env){
   const model=env.CLAUDE_MODEL?.trim();const effort=env.CLAUDE_EFFORT?.trim();
   return ['-p','--output-format','stream-json','--include-partial-messages','--verbose','--no-session-persistence','--allowedTools',allowedTools,'--disallowedTools',disallowedTools,...(model?['--model',model]:[]),...(effort?['--effort',effort]:[])];
 }
+// init 이벤트의 apiKeySource가 none이 아니면 API 키(과금) 방식으로 로그인된 상태다. 필드가 없으면(구버전) 막지 않는다.
+export function isClaudeApiKeyBilled(value:any):boolean{
+  return value?.type==='system'&&value.subtype==='init'&&typeof value.apiKeySource==='string'&&value.apiKeySource!=='none';
+}
+export const claudeApiKeyBlocked='Claude가 API 키 과금 방식으로 로그인되어 있어 토론을 시작하지 않았습니다. 구독 계정으로 claude에 다시 로그인한 뒤 시도하세요.';
 // stream-json 한 줄을 해석한다. 텍스트 조각, 최종 결과, 토큰 사용량만 사용한다.
 export function parseClaudeLine(value:any):{delta?:string;result?:{text:string;error:boolean;usage:ProviderResult['usage']}}{
   if(value?.type==='stream_event'&&value.event?.type==='content_block_delta'&&value.event.delta?.type==='text_delta')return {delta:String(value.event.delta.text||'')};
@@ -57,7 +62,10 @@ export class ClaudeBridge {
       proc.on('error',e=>finish(()=>reject((e as NodeJS.ErrnoException).code==='ENOENT'?new Error(claudeMissing):e)));
       createInterface({input:proc.stdout}).on('line',line=>{
         let parsed:ReturnType<typeof parseClaudeLine>;
-        try {parsed=parseClaudeLine(JSON.parse(line));} catch {return;}
+        let raw:any;
+        try {raw=JSON.parse(line);parsed=parseClaudeLine(raw);} catch {return;}
+        // 모델 호출 전 init 단계에서 끊어 과금이 발생하지 않게 한다.
+        if(isClaudeApiKeyBilled(raw))return stop(claudeApiKeyBlocked);
         if(parsed.delta){text+=parsed.delta;onChunk?.(parsed.delta);}
         if(parsed.result)result=parsed.result;
       });

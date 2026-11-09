@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claudeArgs, claudeExecutable, parseClaudeLine } from './claude.js';
+import { claudeArgs, claudeExecutable, isClaudeApiKeyBilled, parseClaudeLine } from './claude.js';
 import { join } from 'node:path';
 
 describe('Claude bridge', () => {
@@ -9,6 +9,12 @@ describe('Claude bridge', () => {
     const { result } = parseClaudeLine({ type: 'result', result: '최종', is_error: false, usage: { input_tokens: 10, cache_read_input_tokens: 5, output_tokens: 7 } });
     expect(result).toEqual({ text: '최종', error: false, usage: { input: 15, output: 7, source: 'provider' } });
     expect(parseClaudeLine({ type: 'result', result: 'x', is_error: true }).result?.usage.source).toBe('unavailable');
+  });
+  it('blocks API-key billing but not subscription login', () => {
+    expect(isClaudeApiKeyBilled({ type: 'system', subtype: 'init', apiKeySource: 'none' })).toBe(false);
+    expect(isClaudeApiKeyBilled({ type: 'system', subtype: 'init', apiKeySource: 'ANTHROPIC_API_KEY' })).toBe(true);
+    expect(isClaudeApiKeyBilled({ type: 'system', subtype: 'init' })).toBe(false);
+    expect(isClaudeApiKeyBilled({ type: 'result', apiKeySource: 'ANTHROPIC_API_KEY' })).toBe(false);
   });
   it('is read-only and honors env overrides', () => {
     const args = claudeArgs({ CLAUDE_MODEL: 'opus', CLAUDE_EFFORT: 'high' });
