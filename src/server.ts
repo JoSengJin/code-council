@@ -11,7 +11,8 @@ import { ClaudeBridge } from './claude.js';
 import { deleteProject, deleteSession, events, getProject, getSession, projectByPath, projects, saveEvent, saveProject, saveSession, sessions } from './db.js';
 import { agentUsage, performance, writeAggregate } from './reports.js';
 import type { Session } from './types.js';
-import { missingKeys, saveKeys } from './setup.js';
+import { missingKeys, saveKeys, saveLead } from './setup.js';
+import { checkAgents, defaultLead, leadInstalled, leadMissingMessage } from './agents.js';
 import { listDirectories } from './directories.js';
 
 if (existsSync(resolve('.env'))) loadEnvFile(resolve('.env'));
@@ -31,7 +32,12 @@ const controllers=new Map<string,AbortController>();
 const emit=(id:string,event:unknown)=>{if((event as {type?:string}).type!=='message-delta')saveEvent(id,event);for(const fn of listeners.get(id)||[])fn(event);};
 const codex=new CodexBridge(emit);
 const claude=new ClaudeBridge();
-app.get('/api/health',async()=>({ok:true,codexInstalled:process.env.CODEX_DISABLED!=='true',mode:process.env.MOCK_PROVIDERS==='true'?'mock':'live'}));
+app.get('/api/health',async()=>({ok:true,codexInstalled:process.env.CODEX_DISABLED!=='true'&&await leadInstalled('codex'),mode:process.env.MOCK_PROVIDERS==='true'?'mock':'live'}));
+app.get('/api/agents',async()=>checkAgents());
+app.post('/api/agents/lead',async(req,reply)=>{
+  const input=z.object({lead:z.enum(['codex','claude'])}).strict().parse(req.body);
+  try {saveLead(input.lead);return {lead:input.lead};} catch(error) {return reply.code(400).send({error:error instanceof Error?error.message:String(error)});}
+});
 app.get('/api/setup',async()=>missingKeys());
 app.post('/api/setup',async(req,reply)=>{
   const input=z.object({GEMINI_API_KEY:z.string().optional(),OPENROUTER_API_KEY:z.string().optional(),NVIDIA_API_KEY:z.string().optional()}).strict().parse(req.body);
@@ -65,10 +71,12 @@ app.get<{Params:{id:string}}>('/api/sessions/:id/events',async(req,reply)=>{
 app.post('/api/sessions',async(req,reply)=>{
   if(Object.values(missingKeys()).some(Boolean))return reply.code(409).send({error:'먼저 Gemini와 Nemotron API 키를 등록하세요.'});
   const input=z.object({topic:z.string().trim().min(3).max(4000),projectId:z.string().uuid().nullable().optional(),lead:z.enum(['codex','claude']).optional()}).parse(req.body);
+  const lead=input.lead??defaultLead();
+  if(!await leadInstalled(lead))return reply.code(409).send({error:leadMissingMessage(lead)});
   const project=input.projectId?getProject(input.projectId):null;if(input.projectId&&!project)return reply.code(404).send({error:'프로젝트를 찾을 수 없습니다.'});
   if(project)try {if(realpathSync(project.path)!==project.path||!statSync(project.path).isDirectory())throw new Error('Project path changed');}
   catch {return reply.code(409).send({error:'프로젝트 폴더가 이동되었거나 변경되었습니다. 다시 등록하세요.'});}
-  const id=randomUUID();const session:Session={id,lead:input.lead??(process.env.DEFAULT_LEAD==='claude'?'claude':'codex'),...(project?{projectId:project.id,projectPath:project.path}:{}),topic:input.topic,status:'debating',createdAt:new Date().toISOString(),rounds:[],decision:'',plan:'',execution:'',codexThreadId:null,codexTurnId:null,mode:process.env.MOCK_PROVIDERS==='true'?'mock':'live'};
+  const id=randomUUID();const session:Session={id,lead,...(project?{projectId:project.id,projectPath:project.path}:{}),topic:input.topic,status:'debating',createdAt:new Date().toISOString(),rounds:[],decision:'',plan:'',execution:'',codexThreadId:null,codexTurnId:null,mode:process.env.MOCK_PROVIDERS==='true'?'mock':'live'};
   saveSession(session);const controller=new AbortController();controllers.set(id,controller);
   void Promise.resolve().then(()=>graph(emit,controller.signal,codex,claude).invoke({session,proposal:'',criticism:'',rebuttal:'',unresolved:[],route:'CONTINUE'},{configurable:{thread_id:id}})).catch(e=>{const current=getSession(id)||session;current.status=controller.signal.aborted?'stopped':'failed';current.execution=String(e);saveSession(current);emit(id,{type:'error',message:String(e)});}).finally(()=>controllers.delete(id));
   return reply.code(202).send(session);
