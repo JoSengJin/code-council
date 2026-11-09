@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { claudeArgs, claudeExecutable, parseClaudeLine } from './claude.js';
+import { join } from 'node:path';
 
 describe('Claude bridge', () => {
   it('reads text deltas and the final result with usage', () => {
@@ -16,6 +17,8 @@ describe('Claude bridge', () => {
     expect(args[args.indexOf('--allowedTools') + 1]).not.toMatch(/Bash|Edit|Write/);
     expect(args).toEqual(expect.arrayContaining(['--model', 'opus', '--effort', 'high']));
     expect(claudeExecutable({ CLAUDE_BIN: 'C:\\x\\claude.exe' })).toBe('C:\\x\\claude.exe');
-    expect(claudeExecutable({})).toBe('claude');
+    const found = join('bin', 'claude.cmd');
+    expect(claudeExecutable({ PATH: 'bin' }, 'win32', p => p === found)).toBe(found);
+    expect(claudeExecutable({ PATH: 'bin' }, 'win32', () => false)).toBeNull();
   });
 });
