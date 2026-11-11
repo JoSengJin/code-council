@@ -70,7 +70,7 @@ app.get<{Params:{id:string}}>('/api/sessions/:id/events',async(req,reply)=>{
 });
 app.post('/api/sessions',async(req,reply)=>{
   if(Object.values(missingKeys()).some(Boolean))return reply.code(409).send({error:'먼저 Gemini와 Nemotron API 키를 등록하세요.'});
-  const input=z.object({topic:z.string().trim().min(3).max(4000),projectId:z.string().uuid().nullable().optional(),lead:z.enum(['codex','claude']).optional()}).parse(req.body);
+  const input=z.object({topic:z.string().trim().min(3).max(Number(process.env.MAX_TOPIC_CHARS)||30000),projectId:z.string().uuid().nullable().optional(),lead:z.enum(['codex','claude']).optional()}).parse(req.body);
   const lead=input.lead??defaultLead();
   if(!await leadInstalled(lead))return reply.code(409).send({error:leadMissingMessage(lead)});
   const project=input.projectId?getProject(input.projectId):null;if(input.projectId&&!project)return reply.code(404).send({error:'프로젝트를 찾을 수 없습니다.'});
